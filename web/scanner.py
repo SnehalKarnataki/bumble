@@ -24,7 +24,7 @@ class ScannerListener(Device.Listener):
     def on_advertisement(self, advertisement):
         address_type_string = ('P', 'R', 'PI', 'RI')[advertisement.address.address_type]
         print(
-            f'>>> {advertisement.address} [{address_type_string}]: RSSI={advertisement.rssi}, {advertisement.ad_data}'
+            f'>>> {advertisement.address} [{address_type_string}]: RSSI={advertisement.rssi}, {advertisement.data.to_string(" ")}'
         )
 
 

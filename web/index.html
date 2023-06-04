@@ -1,11 +1,11 @@
 <html>
   <head>
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.19.1/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
   </head>
 
   <body>
-    <button onclick="runUSB()">USB</button>
     <button onclick="runSerial()">Serial</button>
+    <button onclick="runWebSocket()">Web Socket</button>
     <br />
     <br />
     <div>Output:</div>
@@ -26,9 +26,8 @@
       output.value = "Initializing...\n";
 
       async function main() {
-          let pyodide = await loadPyodide({
-              indexURL: "https://cdn.jsdelivr.net/pyodide/v0.19.1/full/",
-          })
+          let pyodide = await loadPyodide();
+          console.log("Pyodide loaded");
           output.value += "Ready!\n"
 
           return pyodide;
@@ -61,22 +60,6 @@
             }
       }
 
-      async function runUSB() {
-        const device = await navigator.usb.requestDevice({
-          filters: [
-            {
-                classCode: 0xE0,
-                subclassCode: 0x01
-            }
-          ]
-        });
-
-        if (device.configuration === null) {
-          await device.selectConfiguration(1);
-        }
-        await device.claimInterface(0)
-      }
-
       async function runSerial() {
         const ports = await navigator.serial.getPorts()
           console.log('Paired ports:', ports)
@@ -86,28 +69,64 @@
           const writer = port.writable.getWriter()
       }
 
-      async function run() {
+      async function runWebSocket() {
+        let ws = new WebSocket("ws://localhost:9922/hci");
+        ws.binaryType = "arraybuffer";
 
+        packet_source = {};
+
+        ws.onopen = () => {
+          console.log("WebSocket open");
+        }
+
+        ws.onclose = () => {
+          console.log("WebSocket close");
+        }
+
+        ws.onmessage = (event) => {
+          console.log(`WebSocket message: ${bufferToHex(event.data)}`);
+          if (packet_source.delegate) {
+            packet_source.delegate.data_received(event.data);
+          }
+        }
+
+        writer = (packet) => {
+          ws.send(packet);
+        }
+
+        await run(packet_source, writer);
+      }
+
+      async function run(packet_source, writer) {
           let pyodide = await pyodideReadyPromise;
           try {
-              const script = await(await fetch('scanner.py')).text()
-              await pyodide.loadPackage('micropip')
+              const script = await(await fetch("scanner.py")).text()
+              await pyodide.loadPackage("micropip");
+              // await pyodide.runPythonAsync(`
+              //     import micropip
+              //     await micropip.install('../dist/bumble-0.0.36.dev0+g3adbfe7.d20210807-py3-none-any.whl')
+              // `)
               await pyodide.runPythonAsync(`
-                  import micropip
-                  await micropip.install('../dist/bumble-0.0.36.dev0+g3adbfe7.d20210807-py3-none-any.whl')
+                import micropip
+                package_list = micropip.list()
+                print(package_list)
+                await micropip.install("bumble-0.0.153.dev2+g3697b8d.d20230520-py3-none-any.whl")
               `)
+              //const micropip = pyodide.pyimport("micropip");
+              //await micropip.install("bumble");
               let output = await pyodide.runPythonAsync(script)
               addToOutput(output)
 
               const pythonMain = pyodide.globals.get('main')
-              const packet_source = {}
+              //const packet_source = {}
               const packet_sink = {
                   on_packet: (packet) => {
                     // Variant A, with the conversion done in Javascript
                       const buffer = packet.toJs()
                       console.log(`$$$ on_packet: ${bufferToHex(buffer)}`)
                       // TODO: create an sync queue here instead of blindly calling write without awaiting
-                      /*await*/ writer.write(buffer)
+                      /*await*/ //writer.write(buffer)
+                      writer(buffer);
                       packet.destroy()
 
                     // Variant B, with the conversion `to_js` done at the Python layer
@@ -115,10 +134,10 @@
                     //   /*await*/ writer.write(packet)
                 }
               }
-              serialLooper = readLoop(port, packet_source)
+              //serialLooper = readLoop(port, packet_source)
               pythonResult = await pythonMain(packet_source, packet_sink)
               console.log(pythonResult)
-              serialResult = await serialLooper
+              //serialResult = await serialLooper
               writer.releaseLock()
               await port.close()
               console.log('### done')
