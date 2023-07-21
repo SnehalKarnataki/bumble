@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from bumble.device import Device
-from bumble.transport.common import PacketParser
+from bumble.transport.common import ParserSource
 
 
 # -----------------------------------------------------------------------------
@@ -28,34 +28,22 @@ class ScannerListener(Device.Listener):
         )
 
 
-class HciSource:
-    def __init__(self, host_source):
-        self.parser = PacketParser()
-        host_source.delegate = self
+# class JsSource(ParserSource):
+#     def __init__(self, host_source):
+#         super().__init__()
+#         host_source.delegate = self
 
-    def set_packet_sink(self, sink):
-        self.parser.set_packet_sink(sink)
-
-    # host source delegation
-    def data_received(self, data):
-        print('*** DATA from JS:', data)
-        buffer = bytes(data.to_py())
-        self.parser.feed_data(buffer)
-
-
-# class HciSink:
-#     def __init__(self, host_sink):
-#         self.host_sink = host_sink
-
-#     def on_packet(self, packet):
-#         print(f'>>> PACKET from Python: {packet}')
-#         self.host_sink.on_packet(packet)
+#     def data_received(self, data):
+#         print('*** DATA from JS:', data)
+#         buffer = bytes(data.to_py())
+#         self.parser.feed_data(buffer)
 
 
 # -----------------------------------------------------------------------------
 async def main(host_source, host_sink):
     print('### Starting Scanner')
-    hci_source = HciSource(host_source)
+    #hci_source = JsSource(host_source)
+    hci_source = host_source
     hci_sink = host_sink
     device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
     device.listener = ScannerListener()
