@@ -1,0 +1,76 @@
+<html>
+
+<head>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
+  <script src="../bumble.js"></script>
+</head>
+
+<body>
+  <button id="connectButton" disabled onclick="run()">Connect</button>
+  <br />
+  <br />
+  <div>Output:</div>
+  <textarea id="output" style="width: 100%;" rows="30" disabled></textarea>
+
+  <script>
+    function bufferToHex(buffer) {
+      return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    function logToOutput(s) {
+      output.value += s + "\n";
+      console.log(s);
+    }
+
+    async function run() {
+      const params = (new URL(document.location)).searchParams;
+      const hciWsUrl = params.get("hci") || "ws://localhost:9922/hci";
+
+      const pyodide = await pyodideReadyPromise;
+      try {
+        // Create a WebSocket HCI transport
+        let transport
+        try {
+          transport = await connectWebSocket(pyodide, hciWsUrl);
+        } catch (error) {
+          logToOutput(error);
+          return;
+        }
+
+        // Run the scanner example
+        const script = await (await fetch("scanner.py")).text();
+        await pyodide.runPythonAsync(script);
+        const pythonMain = pyodide.globals.get("main");
+        logToOutput("Starting scanner...");
+        await pythonMain(transport.packet_source, transport.packet_sink);
+        logToOutput("Scanner running");
+      } catch (err) {
+        logToOutput(err);
+      }
+    }
+
+    async function main() {
+      // Load pyodide
+      logToOutput("Loading Pyodide");
+      let pyodide = await loadPyodide();
+
+      // Load Bumble
+      logToOutput("Loading Bumble");
+      const params = (new URL(document.location)).searchParams;
+      const bumbleModule = params.get("module") || "bumble";
+      await loadBumble(pyodide, bumbleModule);
+
+      logToOutput("Ready!")
+
+      // Enable the Connect button
+      document.getElementById("connectButton").disabled = false
+
+      return pyodide;
+    }
+
+    const output = document.getElementById("output");
+    const pyodideReadyPromise = main();
+  </script>
+</body>
+
+</html>
