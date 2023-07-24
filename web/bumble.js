@@ -1,3 +1,7 @@
+function bufferToHex(buffer) {
+    return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
 class PacketSource {
     constructor(pyodide) {
         this.parser = pyodide.runPython(`
@@ -14,6 +18,7 @@ class PacketSource {
     }
 
     data_received(data) {
+        console.log(`HCI[controller->host]: ${bufferToHex(data)}`);
         this.parser.feed_data(data);
     }
 }
@@ -24,15 +29,15 @@ class PacketSink {
     }
 
     on_packet(packet) {
-        const buffer = packet.toJs();
-        console.log(`$$$ on_packet: ${bufferToHex(buffer)}`);
+        const buffer = packet.toJs({create_proxies : false});
+        packet.destroy();
+        console.log(`HCI[host->controller]: ${bufferToHex(buffer)}`);
         // TODO: create an async queue here instead of blindly calling write without awaiting
         this.writer(buffer);
-        packet.destroy();
     }
 }
 
-async function connectWebSocket(pyodide, hciWsUrl) {
+export async function connectWebSocketTransport(pyodide, hciWsUrl) {
     return new Promise((resolve, reject) => {
         let resolved = false;
 
@@ -56,7 +61,6 @@ async function connectWebSocket(pyodide, hciWsUrl) {
         }
 
         ws.onmessage = (event) => {
-            console.log(`WebSocket message: ${bufferToHex(event.data)}`);
             packet_source.data_received(event.data);
         }
 
@@ -65,13 +69,24 @@ async function connectWebSocket(pyodide, hciWsUrl) {
     })
 }
 
-async function loadBumble(pyodide, bumbleModule) {
-      // Load the Bumble module
-      await pyodide.loadPackage("micropip");
-      await pyodide.runPythonAsync(`
+export async function loadBumble(pyodide, bumbleModule) {
+    // Load the Bumble module
+    await pyodide.loadPackage("micropip");
+    await pyodide.runPythonAsync(`
         import micropip
+        await micropip.install("cryptography")
         await micropip.install("${bumbleModule}")
         package_list = micropip.list()
         print(package_list)
-      `)
+    `)
+
+    // Mount a filesystem so that we can persist data like the Key Store
+    let mountDir = "/bumble";
+    pyodide.FS.mkdir(mountDir);
+    pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, { root: "." }, mountDir);
+
+    // Sync previously persisted filesystem data into memory
+    pyodide.FS.syncfs(true, () => {
+        console.log("FS synced in")
+    });
 }

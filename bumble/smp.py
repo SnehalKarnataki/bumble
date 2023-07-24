@@ -1828,15 +1828,7 @@ class Manager(EventEmitter):
     ) -> None:
         # Store the keys in the key store
         if self.device.keystore and identity_address is not None:
-
-            async def store_keys():
-                try:
-                    assert self.device.keystore
-                    await self.device.keystore.update(str(identity_address), keys)
-                except Exception as error:
-                    logger.warning(f'!!! error while storing keys: {error}')
-
-            self.device.abort_on('flush', store_keys())
+            self.device.abort_on('flush', self.device.update_keys(str(identity_address), keys))
 
         # Notify the device
         self.device.on_pairing(session.connection, identity_address, keys, session.sc)

@@ -2,20 +2,19 @@
 
 <head>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
-  <script src="../bumble.js"></script>
 </head>
 
 <body>
-  <button id="connectButton" disabled onclick="run()">Connect</button>
+  <button id="connectButton" disabled>Connect</button>
   <br />
   <br />
   <div>Output:</div>
   <textarea id="output" style="width: 100%;" rows="30" disabled></textarea>
 
-  <script>
-    function bufferToHex(buffer) {
-      return [...new Uint8Array(buffer)].map(x => x.toString(16).padStart(2, '0')).join('');
-    }
+  <script type="module">
+    import { loadBumble, connectWebSocketTransport } from "../bumble.js"
+    let pyodide;
+    let output;
 
     function logToOutput(s) {
       output.value += s + "\n";
@@ -26,12 +25,11 @@
       const params = (new URL(document.location)).searchParams;
       const hciWsUrl = params.get("hci") || "ws://localhost:9922/hci";
 
-      const pyodide = await pyodideReadyPromise;
       try {
         // Create a WebSocket HCI transport
         let transport
         try {
-          transport = await connectWebSocket(pyodide, hciWsUrl);
+          transport = await connectWebSocketTransport(pyodide, hciWsUrl);
         } catch (error) {
           logToOutput(error);
           return;
@@ -50,9 +48,11 @@
     }
 
     async function main() {
+      output = document.getElementById("output");
+
       // Load pyodide
       logToOutput("Loading Pyodide");
-      let pyodide = await loadPyodide();
+      pyodide = await loadPyodide();
 
       // Load Bumble
       logToOutput("Loading Bumble");
@@ -63,13 +63,12 @@
       logToOutput("Ready!")
 
       // Enable the Connect button
-      document.getElementById("connectButton").disabled = false
-
-      return pyodide;
+      const connectButton = document.getElementById("connectButton");
+      connectButton.disabled = false
+      connectButton.addEventListener("click", run)
     }
 
-    const output = document.getElementById("output");
-    const pyodideReadyPromise = main();
+    main();
   </script>
 </body>
 
