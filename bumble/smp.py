@@ -1828,7 +1828,9 @@ class Manager(EventEmitter):
     ) -> None:
         # Store the keys in the key store
         if self.device.keystore and identity_address is not None:
-            self.device.abort_on('flush', self.device.update_keys(str(identity_address), keys))
+            self.device.abort_on(
+                'flush', self.device.update_keys(str(identity_address), keys)
+            )
 
         # Notify the device
         self.device.on_pairing(session.connection, identity_address, keys, session.sc)
