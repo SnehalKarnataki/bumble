@@ -43,7 +43,7 @@ async def async_main(extended_advertising, transport_names):
             host_source=transport.source,
             host_sink=transport.sink,
             link=link,
-            options=options
+            options=options,
         )
         controllers.append(controller)
 

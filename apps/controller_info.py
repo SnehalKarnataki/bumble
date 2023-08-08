@@ -63,9 +63,7 @@ def command_succeeded(response):
 # -----------------------------------------------------------------------------
 async def get_common_info(host):
     if host.supports_command(HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
-        response = await host.send_command(
-            HCI_Read_Local_Supported_Features_Command()
-        )
+        response = await host.send_command(HCI_Read_Local_Supported_Features_Command())
         if response.return_parameters.status == HCI_SUCCESS:
             print()
             print(color('LMP Features:', 'yellow'))
